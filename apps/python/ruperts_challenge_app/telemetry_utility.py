@@ -67,15 +67,12 @@ class TelemetryUtility:
                 #get the indices we care about
                 indices = [0, 0, 0, 0]
                 indices[1], indices[2] = self.index_of_closest(currentLaptime, currentSpline)
-                indices[0] = (indices[1] - 1) % len(self.telemetry)
-                indices[3] = (indices[2] + 1) % len(self.telemetry)
-                #get the spline positions
-                splines = [float(self.telemetry_keys[i]) for i in indices]
-                #get the time positions
-                times = [self.telemetry[self.telemetry_keys[i]]["laptime"] for i in indices]
-                #get the speeds
-                speeds = [self.calculate_velocity_from_mps_vector(self.telemetry[self.telemetry_keys[i]]["velocity"]) for i in indices]
-                gear = self.telemetry[indices[2]]["gear"]
+                indices[0] = (indices[1] - 1) % len(self.telemetry_keys)
+                indices[3] = (indices[2] + 1) % len(self.telemetry_keys)
+                splines = [float(self.telemetry_keys[index]) for index in indices]
+                times = [self.telemetry[self.telemetry_keys[index]]["laptime"] for index in indices]
+                speeds = [self.calculate_velocity_from_mps_vector(self.telemetry[self.telemetry_keys[index]]["velocity"]) for index in indices]
+                gear = self.telemetry[self.telemetry_keys[indices[2]]]["gear"]
 
 
         finally:
@@ -106,7 +103,7 @@ class TelemetryUtility:
         telemetry_data["gear"] = telemetry_entry_2["gear"]
         '''
 
-        telemetry_data["delta"] = weighted_interpolation(splines, times, currentSpline)
+        telemetry_data["delta"] = currentLaptime - weighted_interpolation(splines, times, currentSpline)
         telemetry_data["speed"] = weighted_interpolation(splines, speeds, currentSpline)
         telemetry_data["gear"] = gear
 
