@@ -130,3 +130,6 @@ class ApiManager:
                 ac.log("Time: {}".format(current_time))
                 self.fetch_leaderboard()
                 self.fetch_telemetry()
+            
+            # Prevents thread from consuming excess resources
+            time.sleep(2)
