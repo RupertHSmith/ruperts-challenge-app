@@ -8,6 +8,7 @@ import platform
 import time
 from telemetry_utility import TelemetryUtility
 from api_manager import ApiManager
+from configuration_utility import ConfigurationUtility
 
 PATH_APP = os.path.dirname(__file__)
 path_stdlib=''
@@ -37,21 +38,26 @@ offset = 37
 iosevka = "Iosevka"
 exo2 = "Exo 2"
 
+configuration_file_name = "apps/python/ruperts_challenge_app/config.json"
+
 appWindow = 0
 driver_indicator = 0
 delta_indicator = 0
 speed_indicator = 0
+speed_unit_indicator = 0
 gear_indicator = 0
+
 delta_change_indicator = 0
 running = True
 valid_server = False
+
 api_manager = 0
-
-time_since_last_render = 0
-render_period = 0.1 # s
 telemetry_utility = 0
-telemetry_update_period = 20 # s
+configuration_utility = 0
 
+time_since_last_render = 0 # s
+render_period = 0.1 # s
+telemetry_update_period = 20 # s
 different_gear_time = 0 # s
 different_gear_threshold = 2 # s
 
@@ -59,7 +65,23 @@ DELTA_INCREASING = "increasing"
 DELTA_STEADY = "steady"
 DELTA_DECREASING = "decreasing"
 
+KILOMETERS = "kilometers"
+MILES = "miles"
+
 last_lap_time_reading = 0
+
+class SpeedUnitIndicator:
+    def __init__(self, app):
+        self.speed_unit_indicator = ac.addLabel(appWindow, "Km/h")
+
+        ac.setPosition(self.speed_unit_indicator, 97 * scale, 129 * scale + offset)
+        ac.setFontSize(self.speed_unit_indicator, 11 * scale)
+        ac.setCustomFont(self.speed_unit_indicator, exo2, 0, 0)
+        ac.setFontColor(self.speed_unit_indicator, 0.8, 0.8, 0.8, 1)
+        ac.setFontAlignment(self.speed_unit_indicator, "left")
+
+    def setCurrentValue(self, value):
+        ac.setText(self.speed_unit_indicator, "Km/h" if configuration_utility.get_or_default("speedUnit", KILOMETERS) == KILOMETERS else "mph")
 
 class DeltaIndicator:
     def __init__(self, app):
@@ -170,10 +192,13 @@ def previous_driver(*args):
     different_gear_time = 0
     api_manager.previous_driver()
 
+def toggle_speed_unit(*args):
+    configuration_utility.set_value("speedUnit", MILES if configuration_utility.get_or_default("speedUnit", KILOMETERS) == KILOMETERS else KILOMETERS)
+
 # This function gets called by AC when the Plugin is initialised
 # The function has to return a string with the plugin name
 def acMain(ac_version):
-    global longitudinalGIndicator, appWindow, driver_indicator, delta_indicator, speed_indicator, gear_indicator, delta_change_indicator, api_manager, telemetry_utility, app_window_height, app_window_width, scale, valid_server
+    global longitudinalGIndicator, appWindow, driver_indicator, delta_indicator, speed_indicator, speed_unit_indicator, gear_indicator, delta_change_indicator, api_manager, telemetry_utility, configuration_utility, app_window_height, app_window_width, scale, valid_server
     
     appWindow = ac.newApp(app_name)
     ac.setBackgroundOpacity(appWindow, 0)
@@ -185,6 +210,7 @@ def acMain(ac_version):
     
     telemetry_utility = TelemetryUtility()
     api_manager = ApiManager(telemetry_utility, telemetry_update_period)
+    configuration_utility = ConfigurationUtility(configuration_file_name)
 
     # Manually fetch server data
     # This potentially shouldn't be in here...
@@ -216,9 +242,17 @@ def acMain(ac_version):
     ac.drawBorder(right_button, 0)
     ac.addOnClickedListener(right_button, next_driver)
 
+    speed_unit_button = ac.addButton(appWindow, "")
+    ac.setBackgroundOpacity(speed_unit_button, 0)
+    ac.setSize(speed_unit_button, 150, 48)
+    ac.setPosition(speed_unit_button, 0, 105 + offset)
+    ac.drawBorder(speed_unit_button, 0)
+    ac.addOnClickedListener(speed_unit_button, toggle_speed_unit)
+
     # Render indicators
     delta_indicator = DeltaIndicator(appWindow)
     speed_indicator = SpeedIndicator(appWindow)
+    speed_unit_indicator = SpeedUnitIndicator(appWindow)
     gear_indicator = GearIndicator(appWindow)
     driver_indicator = DriverNameAndLapIndicator(appWindow)
     delta_change_indicator = DeltaChangeIndicator(appWindow)
@@ -268,7 +302,12 @@ def acUpdate(deltaT):
     else:
         delta_change_indicator.setDeltaChange(DELTA_STEADY)
 
-    speed_indicator.setCurrentValue(telemetry_data["speed"])
+    if configuration_utility.get_or_default("speedUnit", KILOMETERS) == KILOMETERS:
+        speed_unit_indicator.setCurrentValue(KILOMETERS)
+        speed_indicator.setCurrentValue(telemetry_data["speed"])
+    else:
+        speed_unit_indicator.setCurrentValue(MILES)
+        speed_indicator.setCurrentValue(round(telemetry_data["speed"] / 1.609))
 
     # Gear
     if current_gear == telemetry_data["gear"]:
@@ -287,3 +326,4 @@ def acUpdate(deltaT):
 def acShutdown():
     # Clear up threads
     api_manager.stop()
+    configuration_utility.save_config()
