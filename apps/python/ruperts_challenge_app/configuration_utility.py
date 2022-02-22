@@ -8,7 +8,6 @@ class ConfigurationUtility:
     try:
       with open(config_file_name) as file:
         self.config = json.load(file)
-        ac.log("{}".format(self.config))
     except FileNotFoundError:
       ac.log("File not found!")
     except json.JSONDecodeError:
