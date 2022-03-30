@@ -46,6 +46,7 @@ delta_indicator = 0
 speed_indicator = 0
 speed_unit_indicator = 0
 gear_indicator = 0
+challenge_name_indicator = 0
 
 delta_change_indicator = 0
 running = True
@@ -56,7 +57,7 @@ telemetry_utility = 0
 configuration_utility = 0
 
 time_since_last_render = 0 # s
-render_period = 0.1 # s
+render_period = 0.2 # s
 telemetry_update_period = 20 # s
 different_gear_time = 0 # s
 different_gear_threshold = 2 # s
@@ -158,10 +159,23 @@ class DriverNameAndLapIndicator:
         ac.setPosition(self.driver_label, app_window_width / 2, offset)
         ac.setFontSize(self.driver_label, 15 * scale)
         ac.setCustomFont(self.driver_label, exo2, 0, 0)
+        ac.setFontColor(self.driver_label, 1, 1, 1, 1)
         ac.setFontAlignment(self.driver_label, "center")
 
     def setCurrentValue(self, value):
         ac.setText(self.driver_label, value)
+
+class ChallengeNameIndicator:
+    def __init__(self, app):
+        self.challenge_label = ac.addLabel(appWindow, "")
+
+        ac.setPosition(self.challenge_label, 12, 8)
+        ac.setFontSize(self.challenge_label, 12 * scale)
+        ac.setCustomFont(self.challenge_label, exo2, 0, 0)
+        ac.setFontColor(self.challenge_label, 0.8, 0.8, 1, 1)
+
+    def setCurrentValue(self, value):
+        ac.setText(self.challenge_label, value)
 
 class DeltaChangeIndicator:
     def __init__(self, app):
@@ -198,7 +212,7 @@ def toggle_speed_unit(*args):
 # This function gets called by AC when the Plugin is initialised
 # The function has to return a string with the plugin name
 def acMain(ac_version):
-    global longitudinalGIndicator, appWindow, driver_indicator, delta_indicator, speed_indicator, speed_unit_indicator, gear_indicator, delta_change_indicator, api_manager, telemetry_utility, configuration_utility, app_window_height, app_window_width, scale, valid_server
+    global longitudinalGIndicator, appWindow, driver_indicator, challenge_name_indicator, delta_indicator, speed_indicator, speed_unit_indicator, gear_indicator, delta_change_indicator, api_manager, telemetry_utility, configuration_utility, app_window_height, app_window_width, scale, valid_server
     
     appWindow = ac.newApp(app_name)
     ac.setBackgroundOpacity(appWindow, 0)
@@ -212,16 +226,17 @@ def acMain(ac_version):
     api_manager = ApiManager(telemetry_utility, telemetry_update_period)
     configuration_utility = ConfigurationUtility(configuration_file_name)
 
+    api_manager.set_current_car(ac.getCarName(0))
+    api_manager.set_current_track(ac.getTrackName(0))
+    api_manager.set_current_layout(ac.getTrackConfiguration(0))
+    
     # Manually fetch server data
     # This potentially shouldn't be in here...
     api_manager.fetch_leaderboard()
     if api_manager.challenge_info:
-        active_challenge_name = api_manager.challenge_info["challengeName"]
-        if ac.getServerName() == active_challenge_name:
-            valid_server = True
-        else:
-            return app_name
-            
+        valid_server = True
+    else:
+        return app_name
 
     api_manager.start()
     
@@ -256,6 +271,7 @@ def acMain(ac_version):
     gear_indicator = GearIndicator(appWindow)
     driver_indicator = DriverNameAndLapIndicator(appWindow)
     delta_change_indicator = DeltaChangeIndicator(appWindow)
+    challenge_name_indicator = ChallengeNameIndicator(appWindow)
 
     return app_name
 
@@ -274,6 +290,7 @@ def acUpdate(deltaT):
         time_since_last_render = 0
     
     # Driver info
+    challenge_name_indicator.setCurrentValue(api_manager.get_challenge_name())
     driver_indicator.setCurrentValue(api_manager.get_selected_driver())
 
     current_laptime = ac.getCarState(0, acsys.CS.LapTime)

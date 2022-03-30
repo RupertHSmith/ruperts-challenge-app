@@ -22,7 +22,7 @@ import requests
 
 domain = "http://rupertsracing.com"
 
-leaderboard_request_route = "{}/api/v1/challenges/active".format(domain)
+leaderboard_request_route = "{}/api/v1/challenges?".format(domain)
 telemetry_request_route = "{}/api/v1/telemetry".format(domain)
 
 def laptime_to_readable(laptime):
@@ -43,6 +43,9 @@ class ApiManager:
         self.challenge_info = {}
 
         self.selected_driver_index = 0
+        self.current_car = ""
+        self.current_track = ""
+        self.current_track_layout = ""
 
     def start(self):
         self.running = True
@@ -71,6 +74,20 @@ class ApiManager:
             self.selected_driver_index = 0
                 
         self.telemetry_update_request = True
+    
+    def set_current_car(self, car):
+        self.current_car = car
+    
+    def set_current_track(self, track):
+        self.current_track = track
+    
+    def set_current_layout(self, layout):
+        self.current_track_layout = layout
+    
+    def get_challenge_name(self):
+        if not self.challenge_info:
+            return ""
+        return self.challenge_info["challengeName"]
 
     def get_selected_driver(self):
         if not self.challenge_info or len(self.challenge_info["leaderboard"]) == 0:
@@ -89,7 +106,7 @@ class ApiManager:
     
     def fetch_leaderboard(self):
         try:
-            response = requests.get(leaderboard_request_route, timeout=5)
+            response = requests.get("{}car={}&track={}&layout={}".format(leaderboard_request_route, self.current_car, self.current_track, self.current_track_layout), timeout=5)
             if response.status_code == 200:
                 data = json.loads(response.text)
                 self.challenge_info = data
@@ -106,8 +123,7 @@ class ApiManager:
         try:
             # Normalise selected driver index in case leaderboard has changed
             self.selected_driver_index = min(self.selected_driver_index, len(self.challenge_info["leaderboard"]) - 1)
-
-            response = requests.get(telemetry_request_route + "/{}".format(self.selected_driver_index), timeout=5)
+            response = requests.get(telemetry_request_route + "/{}/challenge/{}".format(self.selected_driver_index, self.challenge_info["id"]), timeout=5)
             if response.status_code == 200:
                 data = json.loads(response.text)
                 self.telemetry_utility.set_telemetry(data["telemetryEntries"])
@@ -127,7 +143,6 @@ class ApiManager:
                 time_of_last_fetch = current_time
                 self.telemetry_update_request = False
 
-                ac.log("Time: {}".format(current_time))
                 self.fetch_leaderboard()
                 self.fetch_telemetry()
             
